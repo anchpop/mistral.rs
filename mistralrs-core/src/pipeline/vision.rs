@@ -33,9 +33,10 @@ use crate::vision_models::preprocessor_config::PreProcessorConfig;
 use crate::vision_models::processor_config::ProcessorConfig;
 use crate::vision_models::ModelInputs;
 use crate::{
-    api_dir_list, api_get_file, get_paths, get_uqff_paths, vision_normal_model_loader,
-    vision_normal_model_loader_sharded, AnyMoeExpertType, DeviceMapSetting, Ordering,
-    PagedAttentionConfig, Pipeline, Topology, TryIntoDType, GLOBAL_HF_CACHE,
+    api_dir_list, api_get_file, get_paths, get_uqff_paths, lora_model_loader,
+    vision_normal_model_loader, vision_normal_model_loader_sharded, AnyMoeExpertType,
+    DeviceMapSetting, Ordering, PagedAttentionConfig, Pipeline, Topology, TryIntoDType,
+    GLOBAL_HF_CACHE,
 };
 use anyhow::Result;
 use candle_core::{Device, Tensor, Var};
@@ -542,6 +543,9 @@ impl Loader for VisionLoader {
                     multi_progress.clone(),
                     matformer_slicing_config.clone(),
                 ),
+                ModelKind::Adapter {
+                    adapter: AdapterKind::Lora,
+                } => anyhow::bail!("LoRA adapters are not yet supported with NCCL distributed training"),
                 _ => unreachable!(),
             }
         } else {
@@ -559,6 +563,25 @@ impl Loader for VisionLoader {
                     self.config.from_uqff.is_some(),
                     device.clone(),
                     attention_mechanism,
+                    multi_progress,
+                    matformer_slicing_config.clone(),
+                ),
+                ModelKind::Adapter {
+                    adapter: AdapterKind::Lora,
+                } => lora_model_loader!(
+                    paths,
+                    Some(dtype),
+                    &load_device,
+                    layer_devices.clone(),
+                    config,
+                    self.inner,
+                    silent,
+                    mapper,
+                    loading_isq,
+                    self.config.from_uqff.is_some(),
+                    device.clone(),
+                    attention_mechanism,
+                    false, // Vision models don't use MoQE organization
                     multi_progress,
                     matformer_slicing_config.clone(),
                 ),
